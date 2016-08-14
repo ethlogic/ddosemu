@@ -8,8 +8,8 @@ module eth_send #(
 	parameter ifg_len = 28'hFFFF,
 	parameter frame_len = 16'd60,
 
-//    parameter eth_dst   = 48'hFF_FF_FF_FF_FF_FF,
-    parameter eth_dst   = 48'h90_E2_BA_92_CB_D5,
+    parameter eth_dst   = 48'h90_E2_BA_5D_8D_C8,
+//    parameter eth_dst   = 48'h90_E2_BA_92_CB_D5,
 	parameter eth_src   = 48'h00_BB_00_BB_00_BB,
 	parameter eth_proto = ETH_P_IP,
 	parameter ip_saddr  = {8'd192, 8'd168, 8'd11, 8'd122},
@@ -31,14 +31,16 @@ module eth_send #(
 always_comb s_axis_tx_tuser = 1'b0;
 
 // tx_packet
+localparam head_size = 6;
+localparam pad_size  = 121; //249;
 typedef union packed {
-	bit [7:0][63:0] raw;          // 64B
+	bit [head_size-1:0][63:0] raw;           // 48B
 	struct packed {
 		ethhdr eth;                // 14B
 		iphdr ip;                  // 20B
 		udphdr udp;                //  8B
 		dnshdr dns;                //  4B
-		bit [143:0] padding;       // 18B
+		bit [15:0] pad;            //  2B
 	} hdr;
 } packet_t;
 
@@ -97,21 +99,20 @@ end
 
 logic [15:0] dport;
 
-// txcnt
-logic [27:0] txcnt;
-logic [27:0] ifgcnt;
-enum bit [1:0] { TX_IDLE, TX_SEND } tx_state = TX_IDLE;
+// main
+logic [27:0] cnt_send, cnt_pad;
+enum bit [1:0] { TX_IDLE, TX_SEND, TX_PAD, TX_END } tx_state = TX_IDLE;
 always_ff @(posedge clk156) begin
 	if (sys_rst) begin
-		txcnt    <= 0;
+		cnt_send <= 0;
+		cnt_pad  <= 0;
 		tx_state <= TX_IDLE;
-		ifgcnt   <= 0;
 		dport    <= 16'd50001;
 	end else begin
 		case (tx_state)
 			TX_IDLE: begin
-				txcnt  <= 0;
-				ifgcnt <= 0;
+				cnt_send <= 0;
+				cnt_pad  <= 0;
 				if (s_axis_tx_tready) begin
 					tx_state <= TX_SEND;
 					if (dport == 16'd51000) begin
@@ -123,12 +124,23 @@ always_ff @(posedge clk156) begin
 			end
 			TX_SEND: begin
 				if (s_axis_tx_tready)
-					txcnt <= txcnt + 1;
-				if (txcnt == 7)
-					tx_state <= TX_IDLE;
+					cnt_send <= cnt_send + 1;
+				if (cnt_send == (head_size - 1))
+					tx_state <= TX_PAD;
 			end
+			TX_PAD: begin
+                if (s_axis_tx_tready)
+                    cnt_pad <= cnt_pad + 1;
+                if (cnt_pad == (pad_size - 1))
+                    tx_state <= TX_END;
+			end
+			TX_END: begin
+                if (s_axis_tx_tready) begin
+                    tx_state <= TX_IDLE;
+                end
+            end
 			default:
-				txcnt <= 0;
+				tx_state <= TX_IDLE;
 		endcase
 	end
 end
@@ -137,42 +149,38 @@ always_comb tx_pkt.hdr.udp.dest = dport;
 // tdata
 logic [63:0] s_axis_tx_tdata_reg;
 always_comb begin
-	case (txcnt)
-		28'h0: s_axis_tx_tdata_reg = tx_pkt.raw[7];
-		28'h1: s_axis_tx_tdata_reg = tx_pkt.raw[6];
-		28'h2: s_axis_tx_tdata_reg = tx_pkt.raw[5];
-		28'h3: s_axis_tx_tdata_reg = tx_pkt.raw[4];
-		28'h4: s_axis_tx_tdata_reg = tx_pkt.raw[3];
-		28'h5: s_axis_tx_tdata_reg = tx_pkt.raw[2];
-		28'h6: s_axis_tx_tdata_reg = tx_pkt.raw[1];
-		28'h7: s_axis_tx_tdata_reg = tx_pkt.raw[0];
-		default:
-			s_axis_tx_tdata_reg = 64'b0;
-	endcase
+    if (tx_state == TX_SEND) begin
+        case (cnt_send)
+            28'h0: s_axis_tx_tdata_reg = tx_pkt.raw[5];
+            28'h1: s_axis_tx_tdata_reg = tx_pkt.raw[4];
+            28'h2: s_axis_tx_tdata_reg = tx_pkt.raw[3];
+            28'h3: s_axis_tx_tdata_reg = tx_pkt.raw[2];
+            28'h4: s_axis_tx_tdata_reg = tx_pkt.raw[1];
+            28'h5: s_axis_tx_tdata_reg = tx_pkt.raw[0];
+            default:
+                s_axis_tx_tdata_reg = 64'b0;
+        endcase
+    end else begin
+        s_axis_tx_tdata_reg = 64'b0;
+    end
 end
 always_comb s_axis_tx_tdata = endian_conv64(s_axis_tx_tdata_reg);
 
 // tkeep
 always_comb begin
-	case (txcnt)
-		28'h0: s_axis_tx_tkeep = 8'b1111_1111;
-		28'h1: s_axis_tx_tkeep = 8'b1111_1111;
-		28'h2: s_axis_tx_tkeep = 8'b1111_1111;
-		28'h3: s_axis_tx_tkeep = 8'b1111_1111;
-		28'h4: s_axis_tx_tkeep = 8'b1111_1111;
-		28'h5: s_axis_tx_tkeep = 8'b1111_1111;
-		28'h6: s_axis_tx_tkeep = 8'b1111_1111;
-		28'h7: s_axis_tx_tkeep = 8'b0000_1111;
-		default:
-			s_axis_tx_tkeep = 8'b0;
+	case (tx_state)
+		TX_SEND: s_axis_tx_tkeep = 8'b1111_1111;
+		TX_PAD:  s_axis_tx_tkeep = 8'b1111_1111;
+		TX_END:  s_axis_tx_tkeep = 8'b0000_1111;
+ 		default: s_axis_tx_tkeep = 8'b0000_0000;
 	endcase
 end
 
 // tlast
-always_comb s_axis_tx_tlast = (txcnt == 7);
+always_comb s_axis_tx_tlast = (s_axis_tx_tready && tx_state == TX_END);
 
 // tvalid
-always_comb s_axis_tx_tvalid = (tx_state == TX_SEND);
+always_comb s_axis_tx_tvalid = (tx_state == TX_SEND || tx_state == TX_PAD || tx_state == TX_END);
 
 endmodule
 
