@@ -1,16 +1,10 @@
 `timescale 1ns / 1ps
 
 module eth_top #(
-	parameter cold_reset_count           = 14'h3fff,
-
-	parameter PL_LINK_CAP_MAX_LINK_WIDTH = 2,
-	parameter C_DATA_WIDTH               = 64,
-	parameter KEEP_WIDTH                 = C_DATA_WIDTH / 32,
-
+	parameter cold_reset_count = 14'h3fff,
 	parameter ifg_len = 28'hFFFF
 )(
-	input logic clk100,
-	input logic cold_reset,
+	input logic clk50,
 
 	input  logic SFP_CLK_P,
 	input  logic SFP_CLK_N,
@@ -46,23 +40,23 @@ logic [79:0] mac_rx_configuration_vector;
 eth_mac_conf eth_mac_conf0(.*);
 
 // eth_send
-logic        m_axis_tx_tvalid;
-logic        m_axis_tx_tready;
-logic [63:0] m_axis_tx_tdata;
-logic [ 7:0] m_axis_tx_tkeep;
-logic        m_axis_tx_tlast;
-logic        m_axis_tx_tuser;
+logic        s_axis_tx_tvalid;
+logic        s_axis_tx_tready;
+logic [63:0] s_axis_tx_tdata;
+logic [ 7:0] s_axis_tx_tkeep;
+logic        s_axis_tx_tlast;
+logic        s_axis_tx_tuser;
 eth_send eth_send0 (
 	.clk156(clk156),
 	.sys_rst(sys_rst),
 
 	// data out(encap)
-	.m_axis_tvalid(m_axis_tx_tvalid),
-	.m_axis_tready(m_axis_tx_tready),
-	.m_axis_tdata (m_axis_tx_tdata),
-	.m_axis_tkeep (m_axis_tx_tkeep),
-	.m_axis_tlast (m_axis_tx_tlast),
-	.m_axis_tuser (m_axis_tx_tuser)
+	.s_axis_tx_tvalid(s_axis_tx_tvalid),
+	.s_axis_tx_tready(s_axis_tx_tready),
+	.s_axis_tx_tdata (s_axis_tx_tdata),
+	.s_axis_tx_tkeep (s_axis_tx_tkeep),
+	.s_axis_tx_tlast (s_axis_tx_tlast),
+	.s_axis_tx_tuser (s_axis_tx_tuser)
 );
 
 // Ethernet IP
@@ -86,7 +80,7 @@ axi_10g_ethernet_0 axi_10g_ethernet_0_ins (
 	.coreclk_out(clk156),
 	.refclk_n(SFP_CLK_N),
 	.refclk_p(SFP_CLK_P),
-	.dclk(clk100),
+	.dclk(clk50),
 	.reset(sys_rst),
 	.rx_statistics_vector(),
 	.rxn(ETH1_TX_N),
@@ -96,7 +90,7 @@ axi_10g_ethernet_0 axi_10g_ethernet_0_ins (
 	.signal_detect(!ETH1_RX_LOS),
 	.tx_disable(ETH1_TX_DISABLE),
 	.tx_fault(ETH1_TX_FAULT),
-	.tx_ifg_delay(8'd8),
+	.tx_ifg_delay(8'd0),
 	.tx_statistics_vector(),
 	.txn(ETH1_RX_N),
 	.txp(ETH1_RX_P),
@@ -105,12 +99,12 @@ axi_10g_ethernet_0 axi_10g_ethernet_0_ins (
 	.resetdone_out(),
 
 	// eth tx
-	.s_axis_tx_tready(m_axis_tx_tready),
-	.s_axis_tx_tdata (m_axis_tx_tdata),
-	.s_axis_tx_tkeep (m_axis_tx_tkeep),
-	.s_axis_tx_tlast (m_axis_tx_tlast),
-	.s_axis_tx_tvalid(m_axis_tx_tvalid),
-	.s_axis_tx_tuser (m_axis_tx_tuser & zero),
+	.s_axis_tx_tready(s_axis_tx_tready),
+	.s_axis_tx_tdata (s_axis_tx_tdata),
+	.s_axis_tx_tkeep (s_axis_tx_tkeep),
+	.s_axis_tx_tlast (s_axis_tx_tlast),
+	.s_axis_tx_tvalid(s_axis_tx_tvalid),
+	.s_axis_tx_tuser (s_axis_tx_tuser & zero),
 	
 	// eth rx
 	.m_axis_rx_tdata(),

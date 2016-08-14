@@ -2,24 +2,23 @@ import endian_pkg::*;
 import ethernet_pkg::*;
 import ip_pkg::*;
 import udp_pkg::*;
+import dns_pkg::*;
 
 module eth_send #(
 	parameter ifg_len = 28'hFFFF,
 	parameter frame_len = 16'd60,
-	
-	parameter frame_len_width = (frame_len + ETH_FCS_LEN) / 8,
-	parameter frame_len_term_bit = frame_len % 8,
 
-   parameter eth_dst   = 48'hFF_FF_FF_FF_FF_FF,
+//    parameter eth_dst   = 48'hFF_FF_FF_FF_FF_FF,
+    parameter eth_dst   = 48'h90_E2_BA_92_CB_D5,
 	parameter eth_src   = 48'h00_BB_00_BB_00_BB,
 	parameter eth_proto = ETH_P_IP,
 	parameter ip_saddr  = {8'd192, 8'd168, 8'd11, 8'd122},
 	parameter ip_daddr  = {8'd192, 8'd168, 8'd11, 8'd133},
-	parameter udp_sport = 16'h53,
-	parameter udp_dport = 16'h50001            // 50001 ~ 51000
+	parameter udp_sport = 16'd53,
+	parameter udp_dport = 16'd50001            // 50001 ~ 51000
 )(
 	input wire clk156,
-	input wire reset,
+	input wire sys_rst,
 
 	input  wire         s_axis_tx_tready,
 	output logic        s_axis_tx_tvalid,
@@ -38,7 +37,8 @@ typedef union packed {
 		ethhdr eth;                // 14B
 		iphdr ip;                  // 20B
 		udphdr udp;                //  8B
-		bit [175:0] padding;       //
+		dnshdr dns;                //  4B
+		bit [143:0] padding;       // 18B
 	} hdr;
 } packet_t;
 
@@ -83,6 +83,16 @@ always_comb begin
 //	tx_pkt.hdr.udp.dest = udp_dport;
 	tx_pkt.hdr.udp.len = frame_len - ETH_HDR_LEN - IP_HDR_DEFLEN;
 	tx_pkt.hdr.udp.check = 0;
+	
+	tx_pkt.hdr.dns.id = 0;
+	tx_pkt.hdr.dns.qr = 1;
+	tx_pkt.hdr.dns.opcode = 0;
+	tx_pkt.hdr.dns.aa = 0;
+	tx_pkt.hdr.dns.tc = 0;
+	tx_pkt.hdr.dns.rd = 0;
+	tx_pkt.hdr.dns.ra = 0;
+	tx_pkt.hdr.dns.z = 0;
+	tx_pkt.hdr.dns.rcode = 0;
 end
 
 logic [15:0] dport;
@@ -90,9 +100,9 @@ logic [15:0] dport;
 // txcnt
 logic [27:0] txcnt;
 logic [27:0] ifgcnt;
-enum bit [1:0] { TX_IDLE, TX_SEND, TX_IFG } tx_state = TX_IDLE;
+enum bit [1:0] { TX_IDLE, TX_SEND } tx_state = TX_IDLE;
 always_ff @(posedge clk156) begin
-	if (reset) begin
+	if (sys_rst) begin
 		txcnt    <= 0;
 		tx_state <= TX_IDLE;
 		ifgcnt   <= 0;
@@ -104,32 +114,25 @@ always_ff @(posedge clk156) begin
 				ifgcnt <= 0;
 				if (s_axis_tx_tready) begin
 					tx_state <= TX_SEND;
+					if (dport == 16'd51000) begin
+                        dport <= 16'd50001;
+                    end else begin
+                        dport <= dport + 1;
+                    end
 				end
 			end
 			TX_SEND: begin
 				if (s_axis_tx_tready)
 					txcnt <= txcnt + 1;
 				if (txcnt == 7)
-					tx_state <= TX_IFG;
-			end
-			TX_IFG: begin
-				if (dport == 16'd51000) begin
-					dport <= 16'd50001;
-				end else begin
-					dport <= dport + 1;
-				end
-
-				ifgcnt <= ifgcnt + 1;
-				if (ifgcnt == ifg_len) begin
 					tx_state <= TX_IDLE;
-				end
 			end
 			default:
 				txcnt <= 0;
 		endcase
 	end
 end
-always_comb tx_pkt.hdr.udp.dport = dport;
+always_comb tx_pkt.hdr.udp.dest = dport;
 
 // tdata
 logic [63:0] s_axis_tx_tdata_reg;
