@@ -9,7 +9,7 @@ puts "INFO: XDC_SRC"
 puts ${XDC_SRC}
 
 set design top
-set device xc7vx690t-3-ffg1761
+set device xc7vx690t-2-ffg1761
 set outdir build
 
 # Project Settings

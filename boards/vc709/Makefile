@@ -4,7 +4,10 @@ sim_top = app_tb
 outdir = build
 
 # Xilinx sources and top module
-RTL_SRC := rtl/eth/pcs_pma_conf.v                                            \
+RTL_SRC := rtl/clock_control/clock_control.v                                 \
+           rtl/clock_control/clock_control_program.v                         \
+           rtl/clock_control/kcpsm6.v                                        \
+           rtl/eth/pcs_pma_conf.v                                            \
            rtl/eth/eth_mac_conf.v                                            \
            rtl/eth/eth_send.sv                                               \
            rtl/eth/eth_top.sv                                                \
