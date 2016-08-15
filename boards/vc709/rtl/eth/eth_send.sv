@@ -116,10 +116,10 @@ always_ff @(posedge clk156) begin
 				if (s_axis_tx_tready) begin
 					tx_state <= TX_SEND;
 					if (dport == 16'd51000) begin
-                        dport <= 16'd50001;
-                    end else begin
-                        dport <= dport + 1;
-                    end
+						dport <= 16'd50001;
+					end else begin
+						dport <= dport + 1;
+					end
 				end
 			end
 			TX_SEND: begin
@@ -129,16 +129,16 @@ always_ff @(posedge clk156) begin
 					tx_state <= TX_PAD;
 			end
 			TX_PAD: begin
-                if (s_axis_tx_tready)
-                    cnt_pad <= cnt_pad + 1;
-                if (cnt_pad == (pad_size - 1))
-                    tx_state <= TX_END;
+				if (s_axis_tx_tready)
+					cnt_pad <= cnt_pad + 1;
+				if (cnt_pad == (pad_size - 1))
+					tx_state <= TX_END;
 			end
 			TX_END: begin
-                if (s_axis_tx_tready) begin
-                    tx_state <= TX_IDLE;
-                end
-            end
+				if (s_axis_tx_tready) begin
+					tx_state <= TX_IDLE;
+				end
+			end
 			default:
 				tx_state <= TX_IDLE;
 		endcase
@@ -149,20 +149,20 @@ always_comb tx_pkt.hdr.udp.dest = dport;
 // tdata
 logic [63:0] s_axis_tx_tdata_reg;
 always_comb begin
-    if (tx_state == TX_SEND) begin
-        case (cnt_send)
-            28'h0: s_axis_tx_tdata_reg = tx_pkt.raw[5];
-            28'h1: s_axis_tx_tdata_reg = tx_pkt.raw[4];
-            28'h2: s_axis_tx_tdata_reg = tx_pkt.raw[3];
-            28'h3: s_axis_tx_tdata_reg = tx_pkt.raw[2];
-            28'h4: s_axis_tx_tdata_reg = tx_pkt.raw[1];
-            28'h5: s_axis_tx_tdata_reg = tx_pkt.raw[0];
-            default:
-                s_axis_tx_tdata_reg = 64'b0;
-        endcase
-    end else begin
-        s_axis_tx_tdata_reg = 64'b0;
-    end
+	if (tx_state == TX_SEND) begin
+		case (cnt_send)
+			28'h0: s_axis_tx_tdata_reg = tx_pkt.raw[5];
+			28'h1: s_axis_tx_tdata_reg = tx_pkt.raw[4];
+			28'h2: s_axis_tx_tdata_reg = tx_pkt.raw[3];
+			28'h3: s_axis_tx_tdata_reg = tx_pkt.raw[2];
+			28'h4: s_axis_tx_tdata_reg = tx_pkt.raw[1];
+			28'h5: s_axis_tx_tdata_reg = tx_pkt.raw[0];
+			default:
+				s_axis_tx_tdata_reg = 64'b0;
+		endcase
+ end else begin
+	  s_axis_tx_tdata_reg = 64'b0;
+ end
 end
 always_comb s_axis_tx_tdata = endian_conv64(s_axis_tx_tdata_reg);
 
@@ -172,7 +172,7 @@ always_comb begin
 		TX_SEND: s_axis_tx_tkeep = 8'b1111_1111;
 		TX_PAD:  s_axis_tx_tkeep = 8'b1111_1111;
 		TX_END:  s_axis_tx_tkeep = 8'b0000_1111;
- 		default: s_axis_tx_tkeep = 8'b0000_0000;
+		default: s_axis_tx_tkeep = 8'b0000_0000;
 	endcase
 end
 
