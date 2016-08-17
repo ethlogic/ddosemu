@@ -77,7 +77,7 @@ always_comb begin
 	tx_pkt.hdr.ip.frag_off = 0;
 	tx_pkt.hdr.ip.ttl = IPDEFTTL;
 	tx_pkt.hdr.ip.protocol = IP4_PROTO_UDP;
-	tx_pkt.hdr.ip.saddr = ip_saddr;
+//	tx_pkt.hdr.ip.saddr = ip_saddr;
 	tx_pkt.hdr.ip.daddr = ip_daddr;
 	tx_pkt.hdr.ip.check = ipcheck_gen();
 
@@ -98,16 +98,18 @@ always_comb begin
 end
 
 logic [15:0] dport;
+logic [ 9:0] saddr_high;
 
 // main
-logic [27:0] cnt_send, cnt_pad;
+logic [15:0] cnt_send, cnt_pad;
 enum bit [1:0] { TX_IDLE, TX_SEND, TX_PAD, TX_END } tx_state = TX_IDLE;
 always_ff @(posedge clk156) begin
 	if (sys_rst) begin
-		cnt_send <= 0;
-		cnt_pad  <= 0;
-		tx_state <= TX_IDLE;
-		dport    <= 16'd50001;
+		cnt_send   <= 0;
+		cnt_pad    <= 0;
+		tx_state   <= TX_IDLE;
+		dport      <= 16'd50001;
+		saddr_high <= 10'd1;
 	end else begin
 		case (tx_state)
 			TX_IDLE: begin
@@ -115,10 +117,19 @@ always_ff @(posedge clk156) begin
 				cnt_pad  <= 0;
 				if (s_axis_tx_tready) begin
 					tx_state <= TX_SEND;
+
+					// dport
 					if (dport == 16'd51000) begin
 						dport <= 16'd50001;
 					end else begin
 						dport <= dport + 1;
+					end
+
+					// saddr_high
+					if (saddr_high == 10'd1000) begin
+						saddr_high <= 10'd0;
+					end else begin
+						saddr_high <= saddr_high + 1;
 					end
 				end
 			end
@@ -145,6 +156,7 @@ always_ff @(posedge clk156) begin
 	end
 end
 always_comb tx_pkt.hdr.udp.dest = dport;
+always_comb tx_pkt.hdr.ip.saddr = {8'd203, saddr_high, 6'd1, 8'd1};
 
 // tdata
 logic [63:0] s_axis_tx_tdata_reg;
