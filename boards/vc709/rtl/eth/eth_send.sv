@@ -13,7 +13,7 @@ module eth_send #(
 	parameter eth_src   = 48'h00_BB_00_BB_00_BB,
 	parameter eth_proto = ETH_P_IP,
 	parameter ip_saddr  = {8'd192, 8'd168, 8'd11, 8'd122},
-	parameter ip_daddr  = {8'd192, 8'd168, 8'd11, 8'd133},
+	parameter ip_daddr  = {8'd10, 8'd0, 8'd0, 8'd1},
 	parameter udp_sport = 16'd53,
 	parameter udp_dport = 16'd50001            // 50001 ~ 51000
 )(
@@ -156,7 +156,7 @@ always_ff @(posedge clk156) begin
 	end
 end
 always_comb tx_pkt.hdr.udp.dest = dport;
-always_comb tx_pkt.hdr.ip.saddr = {8'd203, saddr_high, 6'd1, 8'd1};
+always_comb tx_pkt.hdr.ip.saddr = {8'd10, saddr_high, 6'd1, 8'd1};
 
 // tdata
 logic [63:0] s_axis_tx_tdata_reg;
