@@ -6,7 +6,9 @@ import dns_pkg::*;
 
 module eth_send #(
 	parameter ifg_len = 28'hFFFF,
-	parameter frame_len = 16'd60,
+	parameter frame_len = 16'd1020,
+	parameter head_size = 6,
+	parameter pad_size  = 121, //249
 
     parameter eth_dst   = 48'h90_E2_BA_5D_8D_C8,
 //    parameter eth_dst   = 48'h90_E2_BA_92_CB_D5,
@@ -31,8 +33,6 @@ module eth_send #(
 always_comb s_axis_tx_tuser = 1'b0;
 
 // tx_packet
-localparam head_size = 6;
-localparam pad_size  = 121; //249;
 typedef union packed {
 	bit [head_size-1:0][63:0] raw;           // 48B
 	struct packed {
@@ -79,7 +79,7 @@ always_comb begin
 	tx_pkt.hdr.ip.protocol = IP4_PROTO_UDP;
 //	tx_pkt.hdr.ip.saddr = ip_saddr;
 	tx_pkt.hdr.ip.daddr = ip_daddr;
-	tx_pkt.hdr.ip.check = ipcheck_gen();
+//	tx_pkt.hdr.ip.check = ipcheck_gen();
 
 	tx_pkt.hdr.udp.source = udp_sport;
 //	tx_pkt.hdr.udp.dest = udp_dport;
@@ -99,6 +99,7 @@ end
 
 logic [15:0] dport;
 logic [ 9:0] saddr_high;
+logic [15:0] ipsum;
 
 // main
 logic [15:0] cnt_send, cnt_pad;
@@ -110,6 +111,7 @@ always_ff @(posedge clk156) begin
 		tx_state   <= TX_IDLE;
 		dport      <= 16'd50001;
 		saddr_high <= 10'd1;
+		ipsum      <= 16'd0;
 	end else begin
 		case (tx_state)
 			TX_IDLE: begin
@@ -117,6 +119,9 @@ always_ff @(posedge clk156) begin
 				cnt_pad  <= 0;
 				if (s_axis_tx_tready) begin
 					tx_state <= TX_SEND;
+
+					// IP checksum
+					ipsum <= ipcheck_gen();
 
 					// dport
 					if (dport == 16'd51000) begin
@@ -157,6 +162,7 @@ always_ff @(posedge clk156) begin
 end
 always_comb tx_pkt.hdr.udp.dest = dport;
 always_comb tx_pkt.hdr.ip.saddr = {8'd10, saddr_high, 6'd1, 8'd1};
+always_comb tx_pkt.hdr.ip.check = ipsum;
 
 // tdata
 logic [63:0] s_axis_tx_tdata_reg;
