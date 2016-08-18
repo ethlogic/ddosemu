@@ -47,7 +47,10 @@ typedef union packed {
 packet_t tx_pkt;
 
 /* function: ipcheck_gen() */
-function [15:0] ipcheck_gen();
+function [15:0] ipcheck_gen(
+		input [31:0] sa,
+		input [31:0] da
+	);
 	bit [23:0] sum;
 	sum = {8'h0, IPVERSION, 4'd5, 8'h0}
 	    + {8'h0, frame_len - ETH_HDR_LEN}   // tot_len
@@ -55,10 +58,10 @@ function [15:0] ipcheck_gen();
 	    + {8'h0, 16'h0}
 	    + {8'h0, IPDEFTTL, IP4_PROTO_UDP}
 	    + {8'h0, 16'h0}                     // checksum (zero padding)
-	    + {8'h0, ip_saddr[31:16]}
-	    + {8'h0, ip_saddr[15: 0]}
-	    + {8'h0, ip_daddr[31:16]}
-	    + {8'h0, ip_daddr[15: 0]};
+	    + {8'h0, sa[31:16]}
+	    + {8'h0, sa[15: 0]}
+	    + {8'h0, da[31:16]}
+	    + {8'h0, da[15: 0]};
 	ipcheck_gen = ~( sum[15:0] + {8'h0, sum[23:16]} );
 endfunction :ipcheck_gen
 
@@ -121,21 +124,7 @@ always_ff @(posedge clk156) begin
 					tx_state <= TX_SEND;
 
 					// IP checksum
-					ipsum <= ipcheck_gen();
-
-					// dport
-					if (dport == 16'd51000) begin
-						dport <= 16'd50001;
-					end else begin
-						dport <= dport + 1;
-					end
-
-					// saddr_high
-					if (saddr_high == 10'd1000) begin
-						saddr_high <= 10'd0;
-					end else begin
-						saddr_high <= saddr_high + 1;
-					end
+					ipsum <= ipcheck_gen(tx_pkt.hdr.ip.saddr, ip_daddr);
 				end
 			end
 			TX_SEND: begin
@@ -153,6 +142,20 @@ always_ff @(posedge clk156) begin
 			TX_END: begin
 				if (s_axis_tx_tready) begin
 					tx_state <= TX_IDLE;
+
+					// dport
+					if (dport == 16'd51000) begin
+						dport <= 16'd50001;
+					end else begin
+						dport <= dport + 1;
+					end
+
+					// saddr_high
+					if (saddr_high == 10'd1000) begin
+						saddr_high <= 10'd0;
+					end else begin
+						saddr_high <= saddr_high + 1;
+					end
 				end
 			end
 			default:
