@@ -101,7 +101,7 @@ always_comb begin
 end
 
 logic [15:0] dport;
-logic [ 9:0] saddr_high;
+logic [15:0] saddr_high;
 logic [15:0] ipsum;
 
 // main
@@ -113,7 +113,7 @@ always_ff @(posedge clk156) begin
 		cnt_pad    <= 0;
 		tx_state   <= TX_IDLE;
 		dport      <= 16'd50001;
-		saddr_high <= 10'd1;
+		saddr_high <= 16'd1;
 		ipsum      <= 16'd0;
 	end else begin
 		case (tx_state)
@@ -144,15 +144,15 @@ always_ff @(posedge clk156) begin
 					tx_state <= TX_IDLE;
 
 					// dport
-					if (dport == 16'd51000) begin
-						dport <= 16'd50001;
-					end else begin
-						dport <= dport + 1;
-					end
+					//if (dport == 16'd51000) begin
+					//	dport <= 16'd50001;
+					//end else begin
+					//	dport <= dport + 1;
+					//end
 
 					// saddr_high
-					if (saddr_high == 10'd1000) begin
-						saddr_high <= 10'd0;
+					if (saddr_high == 16'd32768) begin
+						saddr_high <= 16'd0;
 					end else begin
 						saddr_high <= saddr_high + 1;
 					end
@@ -164,7 +164,7 @@ always_ff @(posedge clk156) begin
 	end
 end
 always_comb tx_pkt.hdr.udp.dest = dport;
-always_comb tx_pkt.hdr.ip.saddr = {8'd10, saddr_high, 6'd1, 8'd1};
+always_comb tx_pkt.hdr.ip.saddr = {8'd10, saddr_high, 8'd1};
 always_comb tx_pkt.hdr.ip.check = ipsum;
 
 // tdata
